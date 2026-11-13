@@ -157,6 +157,7 @@ export default class Regent extends View {
         plan: planOf(row.deadhd),
         waitingFor: row.waitingFor ?? null,
         account: row.account ?? null,
+        repo: row.repo ?? null,
         startedAt: row.startedAt ?? null,
         statusUpdatedAt: row.statusUpdatedAt ?? null,
         context: null,

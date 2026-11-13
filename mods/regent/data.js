@@ -112,6 +112,7 @@ export function buildSessions(agentList, spaceList, data) {
       planDone: done,
       waitingFor: x.waitingFor ?? null,
       account: x.account ?? null,
+      repo: x.repo ?? null,
       startedAt: x.startedAt ?? null,
       statusUpdatedAt: x.statusUpdatedAt ?? null,
       context: Number.isFinite(x.context) ? x.context : null,
@@ -140,6 +141,28 @@ export function groupRecord(rows, by) {
   }
   return [...groups.values()].sort((a, b) => b.minutes - a.minutes
     || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+}
+
+export function groupMap(sessions, spaceList, lens) {
+  if (lens === "repo" || lens === "account") {
+    const byRepo = lens === "repo";
+    const groups = new Map();
+    for (const session of sessions ?? []) {
+      const key = byRepo ? session.repo ?? "" : session.account ?? "";
+      let group = groups.get(key);
+      if (!group) {
+        group = { key, name: key || (byRepo ? "No repo" : "Other"), sessions: [] };
+        groups.set(key, group);
+      }
+      group.sessions.push(session);
+    }
+    return [...groups.values()];
+  }
+  return (spaceList ?? []).map((space) => ({
+    key: space.id,
+    name: space.name,
+    sessions: (sessions ?? []).filter((session) => session.space === space.id),
+  }));
 }
 
 export function countsOf(sessions) {

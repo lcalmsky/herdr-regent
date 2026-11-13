@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  actionQueue, chipGrid, chipMinWidth, groupRecord, parseChoices, sideWidth, queueSubtitle, ringSegments, rosterOf, rosterSlots, statusDetail, unitColumns, waitLabel,
+  actionQueue, chipGrid, chipMinWidth, groupMap, groupRecord, parseChoices, sideWidth, queueSubtitle, ringSegments, rosterOf, rosterSlots, statusDetail, unitColumns, waitLabel,
 } from "../data.js";
 import { ORDER } from "../tokens.js";
 
@@ -45,6 +45,58 @@ test("groupRecord orders by minutes then label", () => {
 
 test("groupRecord returns nothing for no rows", () => {
   assert.deepEqual(groupRecord([], "space"), []);
+});
+
+test("groupMap's status lens keeps one group per space, empty ones included", () => {
+  const sessions = [
+    { address: "a", space: "studio" },
+    { address: "b", space: "garden" },
+    { address: "c", space: "studio" },
+  ];
+  const spaces = [{ id: "studio", name: "Studio" }, { id: "empty", name: "Empty" }, { id: "garden", name: "Garden" }];
+  const groups = groupMap(sessions, spaces, "status");
+  assert.deepEqual(groups.map((group) => [group.key, group.name]), [
+    ["studio", "Studio"],
+    ["empty", "Empty"],
+    ["garden", "Garden"],
+  ]);
+  assert.deepEqual(groups[0].sessions.map((session) => session.address), ["a", "c"]);
+  assert.deepEqual(groups[1].sessions, []);
+});
+
+test("groupMap's repo lens groups by repo, names a missing one and skips empty groups", () => {
+  const sessions = [
+    { address: "a", space: "one", repo: "regent" },
+    { address: "b", space: "one", repo: null },
+    { address: "c", space: "two", repo: "hub" },
+    { address: "d", space: "two", repo: "regent" },
+  ];
+  const groups = groupMap(sessions, [{ id: "one", name: "One" }, { id: "two", name: "Two" }], "repo");
+  assert.deepEqual(groups.map((group) => [group.key, group.name]), [
+    ["regent", "regent"],
+    ["", "No repo"],
+    ["hub", "hub"],
+  ]);
+  assert.deepEqual(groups[0].sessions.map((session) => session.address), ["a", "d"]);
+});
+
+test("groupMap's account lens groups by account and names a missing one Other", () => {
+  const sessions = [
+    { address: "a", space: "one", account: "work" },
+    { address: "b", space: "one" },
+    { address: "c", space: "two", account: "work" },
+  ];
+  const groups = groupMap(sessions, [], "account");
+  assert.deepEqual(groups.map((group) => [group.key, group.name]), [["work", "work"], ["", "Other"]]);
+  assert.deepEqual(groups[0].sessions.map((session) => session.address), ["a", "c"]);
+});
+
+test("groupMap treats an unknown or missing lens like the status lens", () => {
+  const sessions = [{ address: "a", space: "studio" }];
+  const spaces = [{ id: "studio", name: "Studio" }];
+  const expected = [{ key: "studio", name: "Studio", sessions }];
+  assert.deepEqual(groupMap(sessions, spaces, undefined), expected);
+  assert.deepEqual(groupMap(sessions, spaces, "other"), expected);
 });
 
 test("parseChoices reads the colors question", () => {

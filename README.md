@@ -60,7 +60,7 @@ While the top bar has the keyboard, ← → move the selection, ↵ focuses the 
 - **Ribbon** (720 px): one pennant per session, in its space's colour, with its portrait, status medallion and space sigil; the clock at the right.
 - **Terminals** (the middle): the active tab's panes on `#060709` with `#453c2b` borders.
 - **Notes** (72 px): one medallion per session waiting on you or reporting back. A click opens it; a right-click dismisses it.
-- **Map** (360 px): one hex per session, grouped under its space, coloured by status; a Waiting hex blinks. Three lens pills (Status, Repo, Account) sit at the top left.
+- **Map** (360 px): one hex per session, coloured by status; a Waiting hex blinks. Three lens pills (Status, Repo, Account) sit at the top left: Status groups the hexes by space, Repo regroups them by git repository (read from each session's folder) and Account by Claude account.
 - **Unit** (flexible): the selected session's portrait, name, space, branch, program and elapsed time, a checklist bar, six action sockets, and a Plan or Queue column. At 1500 px of its own width and wider it becomes three panels — card, plan or roster, and queue.
 - **Dial** (400 px): a heading that reads Give orders, Read reports or All at work, the next session, a large count and three satellite buttons. Clicking the face or pressing ⌘↵ moves to the next session.
 - **Dialogs** (640 × 560 or 820 × 600): Decision with numbered choices read from the terminal, Complete, New session, Decree, Find, Report and Shortcuts, each drawn in its own gold frame.

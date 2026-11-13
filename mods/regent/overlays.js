@@ -196,7 +196,7 @@ export function renderFound(view) {
     artHeader("art/founding.jpg", 120),
     heading("New session", null),
     body,
-    footerBar("Opens in a new tab. Use ⌘⇧↵ to open beside.", buttons),
+    footerBar("Opens in a new tab.", buttons),
   ]);
 }
 
@@ -281,8 +281,7 @@ export function renderFind(view) {
   }
   if (!rows.length) {
     rows.push(v_flex().px(16).py(10).gap(3)
-      .child(label(`No sessions match “${query}”`, 14, INK, FONT.display))
-      .child(label("Press ↵ to start a new session with this name.", 12, MUTED)));
+      .child(label(`No sessions match “${query}”`, 14, INK, FONT.display)));
   }
   return shell(view, [
     h_flex().flex_none().h(52).px(16).items_center().border_b(1).border_color(LINE)
@@ -377,9 +376,7 @@ const HELP_DECISION = [
 const HELP_HUD = [
   ["Pick a session in the ribbon", ["←", "→"]],
   ["Go to terminal", ["↵"]],
-  ["Pick decree targets", ["x"]],
   ["Decree", ["e"]],
-  ["Rest", ["z"]],
   ["Back to the terminal", ["esc"]],
 ];
 

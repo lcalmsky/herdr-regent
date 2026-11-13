@@ -7,7 +7,7 @@ import { shared, setShared, run, openOverlay, closeOverlay } from "herdr";
 import { liveAgents, liveData, liveSpaces } from "./source.js";
 import { A, C, FONT, ORDER, ST } from "./tokens.js";
 import {
-  GLYPH, actionQueue, bannerOf, buildSessions, chipGrid, chipMinWidth, countsOf, fmtClock, portraitOf, queueOf, queueSubtitle, resolveSelected,
+  GLYPH, actionQueue, bannerOf, buildSessions, chipGrid, chipMinWidth, countsOf, fmtClock, groupMap, portraitOf, queueOf, queueSubtitle, resolveSelected,
   sideWidth, ringSegments, rosterOf, rosterSlots, sigilOf, spanLabel, statusDetail, statusRank, unitColumns, waitLabel,
 } from "./data.js";
 
@@ -354,17 +354,16 @@ export function renderMap(view) {
   const nameBoxes = [];
   const NAME_W = 92;
   const picked = selectedSession(sessions);
-  const pickedSpace = picked?.space ?? null;
-  const ranked = spaceList.map((space) => {
-    const inSpace = sessions.filter((session) => session.space === space.id)
+  const ranked = groupMap(sessions, spaceList, lens).map((group) => {
+    const inGroup = group.sessions.slice()
       .sort((a, b) => statusRank(a.status) - statusRank(b.status));
     return {
-      space,
-      inSpace,
-      blocked: inSpace.some((session) => session.status === "blocked"),
-      done: inSpace.some((session) => session.status === "done"),
-      selected: space.id === pickedSpace,
-      count: inSpace.length,
+      group,
+      inGroup,
+      blocked: inGroup.some((session) => session.status === "blocked"),
+      done: inGroup.some((session) => session.status === "done"),
+      selected: group.sessions.some((session) => session.address === picked?.address),
+      count: inGroup.length,
     };
   }).sort((a, b) => (b.blocked - a.blocked) || (b.done - a.done) || (b.selected - a.selected) || (b.count - a.count));
   const shown = ranked.slice(0, HEX_SLOTS.length);
@@ -372,8 +371,8 @@ export function renderMap(view) {
   shown.forEach((entry, index) => {
     const slots = HEX_SLOTS[index];
     const capacity = slots.length - 1;
-    const drawn = entry.inSpace.slice(0, capacity);
-    const overflow = entry.inSpace.length - drawn.length;
+    const drawn = entry.inGroup.slice(0, capacity);
+    const overflow = entry.inGroup.length - drawn.length;
     slots.forEach((slot, slotIndex) => {
       const [x, y] = hexPoint(slot[0], slot[1]);
       if (slotIndex === 0) {
@@ -386,17 +385,19 @@ export function renderMap(view) {
           while (clashes(top)) top += 14;
         }
         nameBoxes.push({ top, left, right: left + NAME_W });
-        const text = strip && entry.space.name.startsWith(strip) ? entry.space.name.slice(strip.length) : entry.space.name;
+        const name = entry.group.name;
+        const text = lens !== "repo" && lens !== "account" && strip && name.startsWith(strip)
+          ? name.slice(strip.length) : name;
         names.push(h_flex().absolute().left(left).top(top).w(NAME_W).justify_center().gap(2)
           .child(label(text, 10, INK).min_w(0).truncate())
           .when(overflow > 0, (el) => el.child(label(`+${overflow}`, 10, GOLD, FONT.mono).flex_none())));
-        marks.push(div().id(`regent-cap-${entry.space.id}`).absolute().left(x - 12).top(y - 12).w(24).h(24).cursor_pointer()
-          .tooltip(entry.space.name)
+        marks.push(div().id(`regent-cap-${String(entry.group.key).replace(/[^A-Za-z0-9_-]/g, "-")}`).absolute().left(x - 12).top(y - 12).w(24).h(24).cursor_pointer()
+          .tooltip(entry.group.name)
           .on_click(() => {
-            const first = entry.inSpace.find((s) => s.status === "blocked" || s.status === "done") ?? entry.inSpace[0];
+            const first = entry.inGroup.find((s) => s.status === "blocked" || s.status === "done") ?? entry.inGroup[0];
             if (first) setShared("regent.sel", first.address);
           })
-          .child(art(`sigil/${sigilOf(entry.space.id)}.png`).absolute().left(5).top(5).w(14).h(14))
+          .child(art(`sigil/${sigilOf(entry.group.key)}.png`).absolute().left(5).top(5).w(14).h(14))
           .child(art("ui/hex-frame.png").absolute().left(0).top(0).w(24).h(24)));
         return;
       }
@@ -415,7 +416,7 @@ export function renderMap(view) {
     .children(names)
     .when(hidden.length > 0, (el) => el.child(div().id("regent-map-more").absolute().right(8).bottom(6).h(18).px(6)
       .rounded(9).border(1).border_color(C.ruleStrong).bg(C.paper2).flex().items_center()
-      .tooltip(hidden.map((entry) => entry.space.name).join(", "))
+      .tooltip(hidden.map((entry) => entry.group.name).join(", "))
       .child(label(`+${hidden.length}`, 10, MUTED, FONT.mono))))
     .child(hudRule());
 }
@@ -569,8 +570,8 @@ export function renderUnit(view) {
       }))
       .child(socket("decree", "✦", "Send decree e", false, () => openPanel("decree", { terminal: session.address })))
       .child(socket("rename", "✎", "Rename F2", false, () => run("tab.rename", { id: session.tab })))
-      .child(socket("park", "☾", "Rest z", false, () => run("terminal.park", { terminal: session.address })))
-      .child(socket("close", closeArmed ? "!" : "✕", closeArmed ? "Press again to end" : "End session ⌫", closeArmed,
+      .child(socket("park", "☾", "Rest", false, () => run("terminal.park", { terminal: session.address })))
+      .child(socket("close", closeArmed ? "!" : "✕", closeArmed ? "Press again to end" : "End session", closeArmed,
         (_event, cx) => view.armClose(session.address, cx))));
   if (!wide) {
     const sideW = sideWidth(W);

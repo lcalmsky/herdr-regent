@@ -211,6 +211,64 @@ def basename(value):
     return name or None
 
 
+REPO_CACHE = {}
+
+
+def repo_of(cwd):
+    if not isinstance(cwd, str) or not cwd:
+        return None
+    if cwd in REPO_CACHE:
+        return REPO_CACHE[cwd]
+    repo = None
+    try:
+        folder = os.path.abspath(cwd)
+        while True:
+            dotgit = os.path.join(folder, ".git")
+            if os.path.isdir(dotgit):
+                repo = basename(folder)
+                break
+            if os.path.isfile(dotgit):
+                gitdir = None
+                with open(dotgit, "r", encoding="utf-8", errors="replace") as f:
+                    for line in f:
+                        if line.startswith("gitdir:"):
+                            gitdir = line[len("gitdir:"):].strip()
+                            break
+                if gitdir:
+                    if not os.path.isabs(gitdir):
+                        gitdir = os.path.join(folder, gitdir)
+                    gitdir = os.path.normpath(gitdir)
+                    common = gitdir
+                    has_common = False
+                    common_file = os.path.join(gitdir, "commondir")
+                    if os.path.isfile(common_file):
+                        with open(common_file, "r", encoding="utf-8", errors="replace") as f:
+                            value = f.read().strip()
+                        if value:
+                            common = os.path.normpath(os.path.join(gitdir, value))
+                            has_common = True
+                    if not has_common:
+                        # A gitdir without commondir (a submodule) is named after its own folder.
+                        repo = basename(folder)
+                    else:
+                        name = basename(common)
+                        if name and name != ".git" and name.endswith(".git"):
+                            repo = name[:-4] or None
+                        elif basename(os.path.dirname(common)) == "modules" and basename(os.path.dirname(os.path.dirname(common))) == ".git":
+                            repo = name
+                        else:
+                            repo = basename(os.path.dirname(common))
+                break
+            parent = os.path.dirname(folder)
+            if parent == folder:
+                break
+            folder = parent
+    except Exception:
+        repo = None
+    REPO_CACHE[cwd] = repo
+    return repo
+
+
 def tool_label(name, data):
     if not isinstance(name, str) or not name:
         return None
@@ -1676,6 +1734,7 @@ def main():
         output_sessions.append(session)
 
     for session in output_sessions:
+        session.setdefault("repo", repo_of(session.get("cwd")))
         emit(session)
     emit({
         "t": "meta",
