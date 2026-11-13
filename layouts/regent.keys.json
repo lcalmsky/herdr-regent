@@ -1,0 +1,16 @@
+{
+  "layout:regent": {
+    "cmd-enter": "regent.next",
+    "cmd-shift-enter": "regent.read_all",
+    "cmd-k": "regent.find",
+    "cmd-t": "regent.found",
+    "cmd-shift-e": "regent.decree",
+    "cmd-r": "regent.report",
+    "cmd-/": "regent.help",
+    "cmd-shift-1": "regent.filter_blocked",
+    "cmd-shift-2": "regent.filter_done",
+    "cmd-shift-3": "regent.filter_working",
+    "cmd-shift-4": "regent.filter_idle",
+    "ctrl-alt-p": "regent.toggle"
+  }
+}

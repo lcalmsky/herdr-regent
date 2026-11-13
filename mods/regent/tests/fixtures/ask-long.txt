@@ -1,0 +1,15 @@
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ☐ Retry policy
+
+│ GET /reports times out about once in fifty calls on the staging gateway. How should the client retry? The design note only says "retry on failure", and today the client retries three times with no delay, which doubles the load while the gateway is already struggling.
+
+❯ 1. Back off, keep three tries (Recommended)
+     Wait 200 ms, 400 ms, then 800 ms between tries and leave the count at three, so a short outage is still absorbed
+  2. One retry, then fail
+     Retry once after 500 ms and surface the error to the caller, which keeps the load flat but shows more failures
+  3. Type something.
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  4. Chat about this
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── orchard-api-rate-limits-02 ─
