@@ -2,11 +2,50 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  actionQueue, chipGrid, chipMinWidth, parseChoices, sideWidth, queueSubtitle, ringSegments, rosterOf, rosterSlots, statusDetail, unitColumns, waitLabel,
+  actionQueue, chipGrid, chipMinWidth, groupRecord, parseChoices, sideWidth, queueSubtitle, ringSegments, rosterOf, rosterSlots, statusDetail, unitColumns, waitLabel,
 } from "../data.js";
 import { ORDER } from "../tokens.js";
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
+
+test("groupRecord sums per space", () => {
+  const rows = [
+    { session: { space: "studio", spaceName: "Studio" }, minutes: 12, working: 12, blocked: 0, done: 0 },
+    { session: { space: "garden", spaceName: "Garden" }, minutes: 5, working: 0, blocked: 5, done: 0 },
+    { session: { space: "studio", spaceName: "Studio" }, minutes: 3, working: 0, blocked: 0, done: 3 },
+  ];
+  assert.deepEqual(groupRecord(rows, "space"), [
+    { key: "studio", label: "Studio", sample: rows[0].session, count: 2, minutes: 15, working: 12, blocked: 0, done: 3 },
+    { key: "garden", label: "Garden", sample: rows[1].session, count: 1, minutes: 5, working: 0, blocked: 5, done: 0 },
+  ]);
+});
+
+test("groupRecord sums per account and groups a missing one as Other", () => {
+  const rows = [
+    { session: { account: "work" }, minutes: 8, working: 0, blocked: 0, done: 8 },
+    { session: { account: null }, minutes: 4, working: 4, blocked: 0, done: 0 },
+    { session: { account: "home" }, minutes: 1, working: 0, blocked: 1, done: 0 },
+    { session: {}, minutes: 2, working: 0, blocked: 0, done: 0 },
+  ];
+  assert.deepEqual(groupRecord(rows, "account").map((group) => [group.key, group.label, group.count, group.minutes]), [
+    ["work", "work", 1, 8],
+    ["", "Other", 2, 6],
+    ["home", "home", 1, 1],
+  ]);
+});
+
+test("groupRecord orders by minutes then label", () => {
+  const rows = [
+    { session: { space: "beta", spaceName: "Beta" }, minutes: 4, working: 0, blocked: 0, done: 0 },
+    { session: { space: "alpha", spaceName: "Alpha" }, minutes: 4, working: 0, blocked: 0, done: 0 },
+    { session: { space: "gamma", spaceName: "Gamma" }, minutes: 9, working: 0, blocked: 0, done: 0 },
+  ];
+  assert.deepEqual(groupRecord(rows, "space").map((group) => group.label), ["Gamma", "Alpha", "Beta"]);
+});
+
+test("groupRecord returns nothing for no rows", () => {
+  assert.deepEqual(groupRecord([], "space"), []);
+});
 
 test("parseChoices reads the colors question", () => {
   const parsed = parseChoices(fixture("ask-colors.txt"));

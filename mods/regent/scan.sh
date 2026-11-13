@@ -1614,8 +1614,11 @@ def main():
     attached = claude_attach_panes() if any(record.get("kind") == "bg" for _, record, _, _ in records) else []
     pages, unreadable_pages = page_alerts()
 
+    accounts_prefix = os.path.normpath(accounts) + os.sep
     output_sessions = []
     for root, record, session_id, pid in records:
+        normalized_root = os.path.normpath(root)
+        account = os.path.basename(normalized_root) if normalized_root.startswith(accounts_prefix) else "default"
         cwd = record.get("cwd") if isinstance(record.get("cwd"), str) else None
         started_at = ms_num(record.get("startedAt"))
         transcript = transcript_path(root, cwd, session_id)
@@ -1658,6 +1661,7 @@ def main():
             "pages": page_list,
             "where": where,
             "agent": "claude",
+            "account": account,
         })
 
     try:

@@ -5,7 +5,7 @@ import { h_flex, v_flex, Input, Textarea } from "gpui-base";
 import { closeOverlay, exec, notify, props, run } from "herdr";
 import { liveAgents, liveData, liveSpaces } from "./source.js";
 import { A, C, FONT } from "./tokens.js";
-import { GLYPH, buildSessions, nameOf, portraitOf, sigilOf, statusRank } from "./data.js";
+import { GLYPH, buildSessions, groupRecord, nameOf, portraitOf, sigilOf, statusRank } from "./data.js";
 
 const INK = C.ink;
 const INK2 = C.ink2;
@@ -302,7 +302,7 @@ export function renderReport(view) {
   const tabOf = {};
   for (const space of liveSpaces()) for (const tab of space.tabs ?? []) tabOf[tab.id] = tab;
   const minutesSince = (stamp) => (Number.isFinite(stamp) ? Math.max(0, Math.round((now - stamp) / 60000)) : 0);
-  const rows = sessions.map((session) => {
+  const perSession = sessions.map((session) => {
     const tab = tabOf[session.tab] ?? null;
     const minutes = session.status === "working" ? minutesSince(tab?.working_since ?? session.startedAt)
       : session.status === "blocked" ? minutesSince(tab?.changed_at ?? session.statusUpdatedAt)
@@ -315,8 +315,14 @@ export function renderReport(view) {
       blocked: session.status === "blocked" ? minutes : 0,
       done: session.status === "done" ? minutes : 0,
     };
-  }).sort((a, b) => b.minutes - a.minutes).slice(0, 14);
-  const max = Math.max(1, ...rows.map((row) => row.minutes));
+  });
+  const tab = view?.reportTab ?? "session";
+  const rows = tab === "session"
+    ? perSession.sort((a, b) => b.minutes - a.minutes).slice(0, 14)
+      .map((row) => ({ face: row.session, text: row.session.name, row }))
+    : groupRecord(perSession, tab).slice(0, 14)
+      .map((group) => ({ face: group.sample, text: `${group.label} (${group.count})`, row: group }));
+  const max = Math.max(1, ...rows.map(({ row }) => row.minutes));
   const legendDot = (color, text) => h_flex().items_center().gap(4)
     .child(div().size(8).rounded(4).bg(color)).child(label(text, 11, MUTED));
   const body = v_flex().flex_1().min_h(0).justify_start().overflow_y_scroll().px(24).py(8).gap(6)
@@ -325,9 +331,9 @@ export function renderReport(view) {
       .child(legendDot(C.blocked, "Waiting time"))
       .child(legendDot(C.done, "Unread report time"))
       .child(label("Approximate", 11, MUTED)))
-    .children(rows.map((row) => h_flex().h(34).flex_none().gap(10).items_center()
-      .child(hexFace(row.session, 26, 30))
-      .child(div().w(130).flex_none().truncate().text_size(13).font_family(FONT.display).text_color(INK).child(row.session.name))
+    .children(rows.map(({ face, text, row }) => h_flex().h(34).flex_none().gap(10).items_center()
+      .child(hexFace(face, 26, 30))
+      .child(div().w(130).flex_none().truncate().text_size(13).font_family(FONT.display).text_color(INK).child(text))
       .child(div().relative().h(14).flex_1().rounded(2).bg(C.paper2)
         .child(h_flex().absolute().left(0).top(0).h(14).w(`${(row.working / max) * 100}%`).bg(C.working))
         .child(h_flex().absolute().left(`${(row.working / max) * 100}%`).top(0).h(14).w(`${(row.blocked / max) * 100}%`).bg(C.blocked))
@@ -336,9 +342,11 @@ export function renderReport(view) {
   return shell(view, [
     heading("Today's record", null),
     h_flex().flex_none().justify_center().gap(4).px(20)
-      .child(div().h(30).px(12).flex().items_center().border_b(2).border_color(GOLD).child(label("By session", 12, INK)))
-      .child(div().h(30).px(12).flex().items_center().child(label("By space", 12, MUTED)))
-      .child(div().h(30).px(12).flex().items_center().child(label("By account", 12, MUTED))),
+      .children([["session", "By session"], ["space", "By space"], ["account", "By account"]]
+        .map(([key, text]) => div().id(`regent-report-tab-${key}`).h(30).px(12).flex().items_center().cursor_pointer()
+          .when(key === tab, (el) => el.border_b(2).border_color(GOLD))
+          .when(Boolean(view), (el) => el.on_click((_event, cx) => view.setReportTab(key, cx)))
+          .child(label(text, 12, key === tab ? INK : MUTED)))),
     body,
     footerBar("", [actionButton("close", "Close", { quiet: true, key: "esc", onPress: () => closeOverlay(props().overlay) })]),
   ]);

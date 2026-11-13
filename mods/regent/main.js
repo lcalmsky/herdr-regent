@@ -156,6 +156,7 @@ export default class Regent extends View {
       sessions[agent.address] = {
         plan: planOf(row.deadhd),
         waitingFor: row.waitingFor ?? null,
+        account: row.account ?? null,
         startedAt: row.startedAt ?? null,
         statusUpdatedAt: row.statusUpdatedAt ?? null,
         context: null,
@@ -207,6 +208,8 @@ export default class Regent extends View {
       this.searchInput.on("submit", () => this.openFound());
       this.searchInput.focus();
       cx.timer.after(60, () => this.searchInput.focus());
+    } else if (this.role === "report") {
+      this.reportTab = "session";
     }
   }
 
@@ -403,6 +406,11 @@ export default class Regent extends View {
 
   setLens(key, cx) {
     this.lens = key;
+    cx.notify();
+  }
+
+  setReportTab(key, cx) {
+    this.reportTab = key;
     cx.notify();
   }
 

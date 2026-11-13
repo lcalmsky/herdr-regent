@@ -111,11 +111,35 @@ export function buildSessions(agentList, spaceList, data) {
       plan,
       planDone: done,
       waitingFor: x.waitingFor ?? null,
+      account: x.account ?? null,
       startedAt: x.startedAt ?? null,
       statusUpdatedAt: x.statusUpdatedAt ?? null,
       context: Number.isFinite(x.context) ? x.context : null,
     };
   });
+}
+
+// Sessions with no account (native Codex and Gemini) group under "Other".
+export function groupRecord(rows, by) {
+  const byAccount = by === "account";
+  const groups = new Map();
+  for (const row of rows ?? []) {
+    const session = row.session ?? {};
+    const key = byAccount ? session.account ?? "" : session.space;
+    const label = byAccount ? session.account ?? "Other" : session.spaceName ?? session.space;
+    let group = groups.get(key);
+    if (!group) {
+      group = { key, label, sample: row.session, count: 0, minutes: 0, working: 0, blocked: 0, done: 0 };
+      groups.set(key, group);
+    }
+    group.count += 1;
+    group.minutes += row.minutes;
+    group.working += row.working;
+    group.blocked += row.blocked;
+    group.done += row.done;
+  }
+  return [...groups.values()].sort((a, b) => b.minutes - a.minutes
+    || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
 }
 
 export function countsOf(sessions) {
