@@ -247,6 +247,13 @@ export default class Regent extends View {
       }
       return;
     }
+    if (this.role === "complete") {
+      if (key === "enter") {
+        this.focusTerminal();
+        cx.stop_propagation();
+      }
+      return;
+    }
     if (this.role === "find") this.findKey(event, cx);
     else if (this.role === "found" && event.keystroke === "cmd-enter") this.createSession();
     else if (this.role === "decree" && event.keystroke === "cmd-enter") this.sendDecree(cx);

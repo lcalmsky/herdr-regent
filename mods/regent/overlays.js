@@ -296,7 +296,7 @@ export function renderFind(view) {
 
 // ===== report =====
 
-export function renderReport() {
+export function renderReport(view) {
   const sessions = buildSessions(liveAgents(), liveSpaces(), liveData());
   const now = Date.now();
   const tabOf = {};
@@ -333,7 +333,7 @@ export function renderReport() {
         .child(h_flex().absolute().left(`${(row.working / max) * 100}%`).top(0).h(14).w(`${(row.blocked / max) * 100}%`).bg(C.blocked))
         .child(h_flex().absolute().left(`${((row.working + row.blocked) / max) * 100}%`).top(0).h(14).w(`${(row.done / max) * 100}%`).bg(C.done)))
       .child(div().w(48).flex_none().text_size(11).font_family(FONT.mono).text_color(MUTED).child(`${row.minutes}m`))));
-  return shell(null, [
+  return shell(view, [
     heading("Today's record", null),
     h_flex().flex_none().justify_center().gap(4).px(20)
       .child(div().h(30).px(12).flex().items_center().border_b(2).border_color(GOLD).child(label("By session", 12, INK)))
@@ -384,8 +384,8 @@ function helpColumn(title, rows) {
       .child(h_flex().flex_none().gap(3).items_center().children(keys.map((key) => keycap(key))))));
 }
 
-export function renderHelp() {
-  return shell(null, [
+export function renderHelp(view) {
+  return shell(view, [
     heading("Shortcuts", null),
     h_flex().flex_1().min_h(0).items_start().overflow_y_scroll().px(24).py(8).gap(24)
       .child(helpColumn("Everywhere", HELP_ROWS))

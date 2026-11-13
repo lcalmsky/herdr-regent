@@ -51,7 +51,7 @@ The mod does more than draw. This is everything it runs, sends and reads:
 | ⌘⇧4 | `regent.filter_idle` | Filter the ribbon to Resting |
 | ⌃⌥P | `regent.toggle` | Give the top bar the keyboard, or hand it back to the terminal |
 
-While the top bar has the keyboard, ← → move the selection, ↵ focuses the selected terminal, `e` opens Decree for it, and Esc returns the keyboard to the terminal. In the dialogs: 1–9, ↵ and Esc in Decision; ⌘↵ in New session and Decree; ↑ ↓, ↵ and Esc in Find. Esc closes every dialog except Report and Shortcuts, which close with their Close button.
+While the top bar has the keyboard, ← → move the selection, ↵ focuses the selected terminal, `e` opens Decree for it, and Esc returns the keyboard to the terminal. In the dialogs: 1–9, ↵ and Esc in Decision; ⌘↵ in New session and Decree; ↑ ↓, ↵ and Esc in Find. Esc closes every dialog. In Complete, ↵ runs Open report; Report and Shortcuts also have a Close button.
 
 ## What you see
 
@@ -92,6 +92,7 @@ tools/
   preview/           render.sh, made-up data, stand-in terminal mod
 preview.png          2560×1600 gallery picture
 CLAUDE.md
+LICENSE              MIT
 RECIPE.md            the brief to build the layout and mod from scratch
 ```
 
@@ -103,4 +104,6 @@ The bundled fonts are Gowun Batang and Pretendard, both under the SIL Open Font 
 
 `cca` is the Claude Code accounts helper. Its canonical copy lives in the `herdr-claude-accounts` repository, under `mods/claude-accounts/cca`; layout repositories ship copies of it, and this repo carries its own copy alongside `usage-api.mjs`.
 
-No licence file yet.
+## License
+
+MIT for the layout, the `regent` mod, its scripts and the preview tooling (`LICENSE`). The bundled Gowun Batang and Pretendard fonts are under the SIL Open Font License 1.1 (`mods/regent/fonts/OFL-GowunBatang.txt`, `OFL-Pretendard.txt`).
