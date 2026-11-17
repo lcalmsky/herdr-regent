@@ -24,6 +24,23 @@
    ```
 5. **README 의 권한 고지 확인.** mod 가 새로 `exec`·`hc`·네트워크·폴더 밖 파일 읽기를 하게 됐으면 README 의 "Before adding it" 목록에 적는다.
 
+## 런타임 파일은 herdr-shared 에서 온다
+
+`mods/regent/` 의 `scan.sh`, `cca`, `usage-api.mjs`, `codex-usage.mjs`, `models.mjs`, `usage-tap.sh` 와
+`tools/merge-keys.py` 는 `herdr-shared` 저장소가 원본이다. 이 저장소의 사본은 그 저장소의
+`tools/vendor.sh` 가 쓴 것이고, 갤러리 설치가 mod 폴더 하나만 복사하기 때문에 커밋해 둔다.
+
+- 이 저장소에서 사본을 직접 고치지 않는다. 고칠 것이 있으면 `herdr-shared` 에서 고치고 다시 vendor 한다.
+  ```sh
+  ~/git-repo/herdr-shared/tools/vendor.sh \
+    accounts mods/regent scan mods/regent merge-keys tools
+  ```
+- `mods/regent/tests/shared-vendor.test.mjs` 가 사본이 원본과 바이트 단위로 같은지, 실행 비트가 남았는지
+  검사한다. `herdr-shared` 체크아웃(`$HERDR_SHARED` 또는 `~/git-repo/herdr-shared`)이 없으면 건너뛴다.
+- `mods/regent/cca` 는 `main.js` 가 `sh` 없이 직접 실행하므로 실행 비트(755)가 있어야 한다.
+- `tools/install.sh` 는 설치한 mod 폴더가 이 저장소를 가리키는 심볼릭 링크면 `link-installed.sh` 를
+  부르지 않는다. 부르면 저장소 파일이 공유 홈을 가리키는 링크로 바뀐다.
+
 ## 라이선스
 
 저장소는 MIT 다(`LICENSE`). 번들 글꼴(Gowun Batang, Pretendard)은 OFL 1.1 이라 `mods/regent/fonts/` 의 OFL 파일을 지우지 않는다.

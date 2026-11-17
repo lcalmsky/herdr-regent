@@ -22,14 +22,14 @@ cd herdr-regent
 ./tools/install.sh
 ```
 
-The script copies `layouts/regent.json` (with its picker picture `layouts/regent.png`) and `mods/regent/` into `${HERDR_APP_HOME:-$HOME/.config/herdr-app}`, merges `layouts/regent.keys.json` into your `keys.json` (after writing a `keys.json.bak-regent-<timestamp>` copy), and runs `herdr-app check` on the mod. Nothing is downloaded and no pictures are generated. Then pick the layout with `layout.switch {name: "regent"}`, or reach it with `ctrl-shift-l`, which cycles through the layouts.
+The script copies `layouts/regent.json` (with its picker picture `layouts/regent.png`) and `mods/regent/` into `${HERDR_APP_HOME:-$HOME/.config/herdr-app}`, merges `layouts/regent.keys.json` into your `keys.json` (keeping any binding you already have and writing a `keys.json.bak-regent-<timestamp>` copy when it adds one), and runs `herdr-app check` on the mod. When `herdr-shared` is installed and the mod folder is a separate copy, its runtime files are linked to the shared home instead of copied. Nothing is downloaded and no pictures are generated. Then pick the layout with `layout.switch {name: "regent"}`, or reach it with `ctrl-shift-l`, which cycles through the layouts.
 
 ## Before adding it
 
 The mod does more than draw. This is everything it runs, sends and reads:
 
-- **The scan.** Every 3 s the mod runs `sh <appHome>/mods/regent/scan.sh`, which needs `python3`. It runs `ps eww` and `ps -axww` for the session processes and their environments, and `lsof` for each native Codex or Gemini process's working folder. It reads Claude Code's session records and transcripts under `~/.claude` (or `$CLAUDE_CONFIG_DIR`) and under each `~/.claude-accounts/*` that has a `sessions/` folder; Codex rollouts under `~/.codex/sessions`; Gemini chats under `~/.gemini`; the checklist state under `/tmp/deadhd-state` (or `$DEADHD_STATE_DIR`); page alerts under `~/.pulse/pages` (or `$PULSE_PAGES_DIR`); the handoff file and thread notes a session starts from; and the rolling-delivery goals file. It writes only ledger caches under `${TMPDIR:-/tmp}/herdr-pulse` and never opens `*.key` files. The mod uses it for wait reasons, checklists, status times and the account folder name each Claude session runs under (the Report dialog's By account tab).
-- **The account and usage read.** Every 30 s the mod runs `cca --porcelain` (a `sh` script in the mod folder). It reads `~/.claude.json` and `~/.claude-accounts/*/.claude.json`, the current-account and label files under `~/.local/state/herdr-tower/`, the usage records in `~/.local/state/herdr-tower/usage/`, and `~/.codex` / `~/.codex-accounts`. It calls `node` with `models.mjs` and `codex-usage.mjs` from the same folder — this repo does not bundle those two files, so those calls produce nothing. The 5h and 7d gauges read `<name>.json` in the shared usage folder, which is written by a Claude Code status-line hook that this repo does not ship; without such a file the gauges show `—`.
+- **The scan.** Every 3 s the mod runs `sh <appHome>/mods/regent/scan.sh`, which needs `python3`. It runs `ps eww` and `ps -axww` for the session processes and their environments, and `lsof` for each native Codex or Gemini process's working folder. It reads Claude Code's session records and transcripts under `~/.claude` (or `$CLAUDE_CONFIG_DIR`) and under each `~/.claude-accounts/*` that has a `sessions/` folder; Codex rollouts under `~/.codex/sessions`; Gemini chats under `~/.gemini`; the checklist state under `/tmp/deadhd-state` (or `$DEADHD_STATE_DIR`); page alerts under `~/.pulse/pages` (or `$PULSE_PAGES_DIR`); the handoff file a session starts from; and, only when configured, thread notes in the folder `$HERDR_THREAD_SESSIONS` or the `threadSessions` key of `~/.config/herdr-shared/scan.json` names, and the goals file `$HERDR_GOALS_FILE` or `scan.json`'s `goalsFile` key names. It writes only ledger and identity caches under `${TMPDIR:-/tmp}/herdr-pulse` and never opens `*.key` files. The mod uses it for wait reasons, checklists, status times and the account folder name each Claude session runs under (the Report dialog's By account tab).
+- **The account and usage read.** Every 30 s the mod runs `cca --porcelain` (a `sh` script in the mod folder). It reads `~/.claude.json` and `~/.claude-accounts/*/.claude.json`, the current-account and label files under `~/.local/state/herdr-tower/`, the usage records in `~/.local/state/herdr-tower/usage/`, and `~/.codex` / `~/.codex-accounts`. It calls `node` with `models.mjs` and `codex-usage.mjs` from the same folder: the first reads and writes the extra models listed in `~/.local/state/herdr-tower/models.json` and runs a model's own `usage` command through `/bin/sh -c`, the second reads the newest Codex rollout log and its `auth.json`. The 5h and 7d gauges read `<name>.json` in the shared usage folder, which `usage-tap.sh` (in the same folder) writes when it is installed as a Claude Code status-line hook; until then the gauges show `—`.
 - **The network.** This is the only outbound call: at most every 5 minutes, when `node` and macOS `security` are present, `cca` reads the account's OAuth token from the keychain and `usage-api.mjs` requests `https://api.anthropic.com/api/oauth/usage` for the model's weekly usage. It writes the result to `~/.local/state/herdr-tower/usage/<name>.api.json` and keeps the previous file on failure. `cca` makes that request on its own schedule whether or not this window needs the answer; the 5h and 7d gauges read the local records, not this response. Nothing else here makes a network call.
 - **Herdr's `hc`.** The Decision dialog runs `hc read <terminal>`; pressing a number runs `hc keys <terminal> <n>`; Decree runs `hc send <address> <text>` on each chosen session. The mod also runs Herdr commands to focus, split and close panes, select and rename tabs, park a terminal, and create a tab.
 - **The layout keys** are delivered to the mod's command loop, which lives in the top bar block.
@@ -82,13 +82,16 @@ mods/regent/
   scan.sh            the 3 s session scan
   cca                the Claude Code account and usage reader
   usage-api.mjs      the usage fetch cca runs
+  codex-usage.mjs    the Codex rate limits and login cca reads
+  models.mjs         the extra-models file cca lists and adds
+  usage-tap.sh       the status-line hook that records rate limits
   mod.json           place none, title, focusable
   assets/            ui frames, portraits, sigils, map and event art
   fonts/             Gowun Batang and Pretendard with their OFL files
-  tests/             node tests for data.js with screen fixtures
+  tests/             node tests for data.js, with screen fixtures, and for the vendored copies
 tools/
   install.sh         copies the layout and mod, merges keys, checks the mod
-  merge-keys.py      merges the layout's key section, keeping a backup
+  merge-keys.py      merges the layout's key zone, keeping the person's bindings
   preview/           render.sh, made-up data, stand-in terminal mod
 preview.png          2560×1600 gallery picture
 CLAUDE.md
@@ -102,7 +105,7 @@ The art under `mods/regent/assets/` is original, generated for this layout.
 
 The bundled fonts are Gowun Batang and Pretendard, both under the SIL Open Font License 1.1 (`mods/regent/fonts/OFL-GowunBatang.txt`, `OFL-Pretendard.txt`). JetBrains Mono is named by the layout and the mono labels but is not bundled.
 
-`cca` is the Claude Code accounts helper. Its canonical copy lives in the `herdr-claude-accounts` repository, under `mods/claude-accounts/cca`; layout repositories ship copies of it, and this repo carries its own copy alongside `usage-api.mjs`.
+`cca` and the other runtime files in `mods/regent/` (`scan.sh`, `usage-api.mjs`, `codex-usage.mjs`, `models.mjs`, `usage-tap.sh`) and `tools/merge-keys.py` are the `herdr-shared` repository's files, vendored with its `tools/vendor.sh` and committed here so a gallery install of the mod folder is self-contained.
 
 ## License
 

@@ -1,9 +1,9 @@
 #!/bin/sh
-# Read-only session scan for the Pulse mod. Prints one JSON object per line:
+# Read-only session scan shared by the Herdr mods. Prints one JSON object per line:
 # {t:"s", ...} for each live Claude Code, Codex or Gemini CLI session, then one
 # {t:"meta", ...}. Reads session records, transcripts, agent rollout/chat files,
 # deadhd state, page alerts and the session processes' environment, plus the handoff
-# file and Maveyyo thread memory a session starts from. Writes nothing but its ledger
+# file and thread memory a session starts from. Writes nothing but its ledger
 # and identity caches under ${TMPDIR:-/tmp}/herdr-pulse. Secrets (*.key) are never opened.
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -599,11 +599,38 @@ def summarize_transcript(path):
 
 HEAD_BYTES = 512 * 1024
 HANDOFF_RE = re.compile(r"(/[^\s`'\"]+/\.claude/handoff/[\w.-]+\.md)")
-ROUND_RE = re.compile(r"(\d+)\s*회차")
+# A round is counted either in Korean ("3회차") or in English ("round 3").
+ROUND_RE = re.compile(r"(\d+)\s*회차|\bround\s+(\d+)\b", re.IGNORECASE)
 PASTE_H1_RE = re.compile(r"<pasted_content[^>]*>\s*#\s+([^\n#<]+)")
 ARGS_RE = re.compile(r"<command-args>(.*?)</command-args>", re.S)
-MAVEYYO_SESSIONS = os.path.join(HOME, ".claude", "state", "maveyyo-bot", "sessions")
-MAVEYYO_KEY_RE = re.compile(r"^([A-Z0-9]+)-(\d+)_(\d+)$")
+# The thread-memory folder and the goals file are optional inputs: the environment names the
+# path first, then ${XDG_CONFIG_HOME:-$HOME/.config}/herdr-shared/scan.json, and with neither
+# that reader is off.
+CONFIG_PATH = os.path.join(
+    os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config"), "herdr-shared", "scan.json")
+
+
+def scan_config():
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+CONFIG = scan_config()
+
+
+def configured_path(key):
+    value = CONFIG.get(key)
+    if not isinstance(value, str) or not value:
+        return None
+    return HOME + value[1:] if value == "~" or value.startswith("~/") else value
+
+
+THREAD_SESSIONS = os.environ.get("HERDR_THREAD_SESSIONS") or configured_path("threadSessions")
+THREAD_KEY_RE = re.compile(r"^([A-Z0-9]+)-(\d+)_(\d+)$")
 MEMORY_TOPIC_RE = re.compile(r"^-\s*(질문|원글):\s*(.+)$")
 
 
@@ -651,13 +678,15 @@ def first_heading(path):
     return None
 
 
-def maveyyo_topic(cwd):
-    match = MAVEYYO_KEY_RE.match(os.path.basename(cwd))
+def thread_topic(cwd):
+    if not THREAD_SESSIONS:
+        return None
+    match = THREAD_KEY_RE.match(os.path.basename(cwd))
     if not match:
         return None
     channel, seconds, fraction = match.groups()
     thread = {"channel": channel, "threadAt": int(seconds) * 1000}
-    state = os.path.dirname(MAVEYYO_SESSIONS)
+    state = os.path.dirname(THREAD_SESSIONS)
     record = jload(os.path.join(state, "threads", os.path.basename(cwd) + ".json"))
     if isinstance(record, dict):
         thread["lane"] = text(record.get("lane"))
@@ -700,12 +729,14 @@ def maveyyo_topic(cwd):
     return thread
 
 
-RD_PROGRAMS = os.path.join(HOME, ".claude", "state", "rolling-delivery", "active-programs.json")
+RD_PROGRAMS = os.environ.get("HERDR_GOALS_FILE") or configured_path("goalsFile")
 OBJECTIVE_RE = re.compile(r"^\s*([A-Z][A-Z0-9]+-\d+)\s+(.+)$", re.S)
 
 
 def rd_objectives():
-    """Each ticket's rolling-delivery goal, newest program first: {"ABC-123": "goal text"}."""
+    """Each ticket's goal from the goals file, newest program first: {"ABC-123": "goal text"}."""
+    if not RD_PROGRAMS:
+        return {}
     try:
         with open(RD_PROGRAMS, encoding="utf-8") as handle:
             programs = json.load(handle).get("programs") or []
@@ -726,7 +757,7 @@ def rd_objectives():
 
 def identity_path(session_id):
     safe = re.sub(r"[^A-Za-z0-9._-]", "_", session_id)
-    return os.path.join(CACHE_DIR, "identity-" + safe + ".json")
+    return os.path.join(CACHE_DIR, "identity-v2-" + safe + ".json")
 
 
 # What a session is about, read once from the start of its transcript and the files it names; handoff
@@ -746,15 +777,15 @@ def session_identity(path, session_id, cwd):
                 identity["handoff"] = heading
         round_match = ROUND_RE.search(prompt)
         if round_match:
-            identity["round"] = int(round_match.group(1))
+            identity["round"] = int(round_match.group(1) or round_match.group(2))
         paste = PASTE_H1_RE.search(prompt)
         if paste:
             identity["paste"] = collapse(paste.group(1))
-    if cwd and os.path.dirname(os.path.normpath(cwd)) == MAVEYYO_SESSIONS:
-        thread = maveyyo_topic(cwd)
+    if cwd and THREAD_SESSIONS and os.path.dirname(os.path.normpath(cwd)) == THREAD_SESSIONS:
+        thread = thread_topic(cwd)
         if thread:
-            identity["maveyyo"] = thread
-    final = bool(prompt) and (not identity.get("maveyyo") or bool(identity["maveyyo"].get("topic")))
+            identity["thread"] = thread
+    final = bool(prompt) and (not identity.get("thread") or bool(identity["thread"].get("topic")))
     try:
         os.makedirs(CACHE_DIR, exist_ok=True)
         with open(identity_path(session_id), "w", encoding="utf-8") as f:
