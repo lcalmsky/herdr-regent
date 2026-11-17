@@ -22,7 +22,7 @@ cd herdr-regent
 ./tools/install.sh
 ```
 
-The script copies `layouts/regent.json` (with its picker picture `layouts/regent.png`) and `mods/regent/` into `${HERDR_APP_HOME:-$HOME/.config/herdr-app}`, merges `layouts/regent.keys.json` into your `keys.json` (keeping any binding you already have and writing a `keys.json.bak-regent-<timestamp>` copy when it adds one), and runs `herdr-app check` on the mod. When `herdr-shared` is installed and the mod folder is a separate copy, its runtime files are linked to the shared home instead of copied. Nothing is downloaded and no pictures are generated. Then pick the layout with `layout.switch {name: "regent"}`, or reach it with `ctrl-shift-l`, which cycles through the layouts.
+The script copies `layouts/regent.json` (with its picker picture `layouts/regent.png`) and `mods/regent/` into `${HERDR_APP_HOME:-$HOME/.config/herdr-app}`, merges `layouts/regent.keys.json` into your `keys.json` (keeping any binding you already have and writing a `keys.json.bak-regent-<timestamp>` copy when it adds one), and runs `herdr-app check` on the mod. When `herdr-shared` is installed and the mod folder is a separate copy, its runtime files are linked to the shared home instead of copied. Nothing is downloaded and no pictures are generated. The runtime files under `mods/regent/` are copies generated from the [herdr-shared](https://github.com/lcalmsky/herdr-shared) submodule at `vendor/herdr-shared`; `git clone --recursive` is only needed for the drift check, not for installing. Then pick the layout with `layout.switch {name: "regent"}`, or reach it with `ctrl-shift-l`, which cycles through the layouts.
 
 ## Before adding it
 
@@ -105,7 +105,7 @@ The art under `mods/regent/assets/` is original, generated for this layout.
 
 The bundled fonts are Gowun Batang and Pretendard, both under the SIL Open Font License 1.1 (`mods/regent/fonts/OFL-GowunBatang.txt`, `OFL-Pretendard.txt`). JetBrains Mono is named by the layout and the mono labels but is not bundled.
 
-`cca` and the other runtime files in `mods/regent/` (`scan.sh`, `usage-api.mjs`, `codex-usage.mjs`, `models.mjs`, `usage-tap.sh`) and `tools/merge-keys.py` are the `herdr-shared` repository's files, vendored with its `tools/vendor.sh` and committed here so a gallery install of the mod folder is self-contained.
+`cca` and the other runtime files in `mods/regent/` (`scan.sh`, `usage-api.mjs`, `codex-usage.mjs`, `models.mjs`, `usage-tap.sh`) and `tools/merge-keys.py` are generated from the [herdr-shared](https://github.com/lcalmsky/herdr-shared) submodule at `vendor/herdr-shared` with its `tools/vendor.sh`, and committed here so a gallery install of the mod folder is self-contained.
 
 ## License
 

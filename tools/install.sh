@@ -3,7 +3,7 @@
 set -eu
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 HOME_DIR=${HERDR_APP_HOME:-$HOME/.config/herdr-app}
-SHARED=${HERDR_SHARED:-$HOME/git-repo/herdr-shared}
+SHARED=${HERDR_SHARED:-$REPO/vendor/herdr-shared}
 SHARED_HOME=${HERDR_SHARED_HOME:-$HOME/.local/share/herdr-shared}
 mkdir -p "$HOME_DIR/layouts" "$HOME_DIR/mods"
 cp "$REPO/layouts/regent.json" "$HOME_DIR/layouts/"

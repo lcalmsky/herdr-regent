@@ -27,16 +27,20 @@
 ## 런타임 파일은 herdr-shared 에서 온다
 
 `mods/regent/` 의 `scan.sh`, `cca`, `usage-api.mjs`, `codex-usage.mjs`, `models.mjs`, `usage-tap.sh` 와
-`tools/merge-keys.py` 는 `herdr-shared` 저장소가 원본이다. 이 저장소의 사본은 그 저장소의
-`tools/vendor.sh` 가 쓴 것이고, 갤러리 설치가 mod 폴더 하나만 복사하기 때문에 커밋해 둔다.
+`tools/merge-keys.py` 는 `vendor/herdr-shared` 서브모듈에서 생성한 사본이다. `herdr-shared.list` 가
+그룹과 대상을 정하고, 사본은 그 서브모듈의 `vendor/herdr-shared/tools/vendor.sh --list .` 가 다시 쓴다.
+갤러리 설치가 mod 폴더 하나만 복사하기 때문에 사본을 커밋해 둔다.
 
-- 이 저장소에서 사본을 직접 고치지 않는다. 고칠 것이 있으면 `herdr-shared` 에서 고치고 다시 vendor 한다.
-  ```sh
-  ~/git-repo/herdr-shared/tools/vendor.sh \
-    accounts mods/regent scan mods/regent merge-keys tools
-  ```
-- `mods/regent/tests/shared-vendor.test.mjs` 가 사본이 원본과 바이트 단위로 같은지, 실행 비트가 남았는지
-  검사한다. `herdr-shared` 체크아웃(`$HERDR_SHARED` 또는 `~/git-repo/herdr-shared`)이 없으면 건너뛴다.
+```sh
+vendor/herdr-shared/tools/vendor.sh --list .
+```
+
+- 이 저장소에서 사본을 직접 고치지 않는다. 고칠 것이 있으면 `herdr-shared` 에서 고치고 push 한 뒤
+  herdr-shared 에서 `tools/sync-themes.sh --commit --push` 를 돌린다. 이 명령이 이 저장소의
+  서브모듈을 올리고, 사본을 다시 쓰고, 테스트하고, 커밋하고, push 한다.
+- `mods/regent/tests/shared-vendor.test.mjs` 가 `vendor/herdr-shared/tools/check-vendor.sh` 로 사본이
+  서브모듈과 바이트 단위로 같은지, 실행 비트가 남았는지 검사한다. 서브모듈을 받지 않았으면
+  (`git submodule update --init` 전) 건너뛴다.
 - `mods/regent/cca` 는 `main.js` 가 `sh` 없이 직접 실행하므로 실행 비트(755)가 있어야 한다.
 - `tools/install.sh` 는 설치한 mod 폴더가 이 저장소를 가리키는 심볼릭 링크면 `link-installed.sh` 를
   부르지 않는다. 부르면 저장소 파일이 공유 홈을 가리키는 링크로 바뀐다.
