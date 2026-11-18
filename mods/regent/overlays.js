@@ -2,10 +2,10 @@
 // its own gold frame, because openOverlay uses frame: "none".
 import { div, image } from "gpui-kit";
 import { h_flex, v_flex, Input, Textarea } from "gpui-base";
-import { closeOverlay, exec, notify, props, run } from "herdr";
+import { exec, notify, props, run } from "herdr";
 import { liveAgents, liveData, liveSpaces } from "./source.js";
 import { A, C, FONT } from "./tokens.js";
-import { GLYPH, buildSessions, groupRecord, nameOf, portraitOf, sigilOf, statusRank } from "./data.js";
+import { GLYPH, buildSessions, groupRecord, nameOf, portraitOf, reportMinutes, sigilOf, statusRank } from "./data.js";
 
 const INK = C.ink;
 const INK2 = C.ink2;
@@ -196,7 +196,7 @@ export function renderFound(view) {
     artHeader("art/founding.jpg", 120),
     heading("New session", null),
     body,
-    footerBar("Opens in a new tab.", buttons),
+    footerBar(AGENT_PICKS[view.pickAgent]?.argv ? "Opens in a new tab." : "Opens a plain shell in a new tab; the instructions are not sent.", buttons),
   ]);
 }
 
@@ -231,7 +231,7 @@ export function renderDecree(view) {
   return shell(view, [
     heading("Decree", "Send the same instructions to the chosen sessions"),
     body,
-    footerBar("Working sessions take it after their current reply", buttons),
+    footerBar(view.decreeError ?? "Working sessions take it after their current reply; Waiting ones are skipped", buttons),
   ]);
 }
 
@@ -300,13 +300,8 @@ export function renderReport(view) {
   const now = Date.now();
   const tabOf = {};
   for (const space of liveSpaces()) for (const tab of space.tabs ?? []) tabOf[tab.id] = tab;
-  const minutesSince = (stamp) => (Number.isFinite(stamp) ? Math.max(0, Math.round((now - stamp) / 60000)) : 0);
   const perSession = sessions.map((session) => {
-    const tab = tabOf[session.tab] ?? null;
-    const minutes = session.status === "working" ? minutesSince(tab?.working_since ?? session.startedAt)
-      : session.status === "blocked" ? minutesSince(tab?.changed_at ?? session.statusUpdatedAt)
-        : session.status === "done" ? minutesSince(tab?.settled_at ?? session.statusUpdatedAt)
-          : minutesSince(session.startedAt);
+    const minutes = reportMinutes(session, tabOf[session.tab] ?? null, now);
     return {
       session,
       minutes,
@@ -347,7 +342,7 @@ export function renderReport(view) {
           .when(Boolean(view), (el) => el.on_click((_event, cx) => view.setReportTab(key, cx)))
           .child(label(text, 12, key === tab ? INK : MUTED)))),
     body,
-    footerBar("", [actionButton("close", "Close", { quiet: true, key: "esc", onPress: () => closeOverlay(props().overlay) })]),
+    footerBar("", [actionButton("close", "Close", { quiet: true, key: "esc", onPress: () => view.close() })]),
   ]);
 }
 
@@ -398,6 +393,6 @@ export function renderHelp(view) {
         .child(helpColumn("When the decision dialog is open", HELP_DECISION))
         .child(helpColumn("When the HUD has the keyboard (⌃⌥P)", HELP_HUD))),
     footerBar("⌃ combos the terminal programs use are never taken",
-      [actionButton("close", "Close", { quiet: true, key: "esc", onPress: () => closeOverlay(props().overlay) })]),
+      [actionButton("close", "Close", { quiet: true, key: "esc", onPress: () => view.close() })]),
   ]);
 }

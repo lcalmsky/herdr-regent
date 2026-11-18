@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  actionQueue, chipGrid, chipMinWidth, groupMap, groupRecord, parseChoices, sideWidth, queueSubtitle, ringSegments, rosterOf, rosterSlots, statusDetail, unitColumns, waitLabel,
+  actionQueue, buildSessions, chipGrid, chipMinWidth, decreeBlocker, decreePicks, decreeTargets, groupMap, groupRecord, newTabArgs, parseChoices,
+  reportMinutes, sideWidth, queueSubtitle, ringSegments, rosterOf, rosterSlots, statusDetail, unitColumns, waitLabel,
 } from "../data.js";
 import { ORDER } from "../tokens.js";
 
@@ -292,4 +293,125 @@ test("sideWidth keeps the narrow unit block's side column between its bounds", (
   assert.equal(sideWidth(1499), 540);
   assert.equal(sideWidth(4000), 720);
   assert.equal(sideWidth(0), 420);
+});
+
+test("buildSessions takes each session's branch from its own pane", () => {
+  const space = { id: "s1", name: "Space", branch: "main" };
+  const agents = [
+    { address: "t1", pane: "p1", space: "s1", status: "working" },
+    { address: "t2", pane: "p2", space: "s1", status: "working" },
+  ];
+  const panes = [{ pane: "p1", branch: "feature/a" }, { pane: "p2", branch: "fix/b" }];
+  const sessions = buildSessions(agents, [space], null, panes);
+  assert.deepEqual(sessions.map((s) => s.branch), ["feature/a", "fix/b"]);
+  assert.ok(sessions.every((s) => s.branch !== "main"));
+});
+
+test("buildSessions keeps a null pane branch and a pane missing from the list as null", () => {
+  const agents = [
+    { address: "t1", pane: "p1", space: "s1", status: "working" },
+    { address: "t2", pane: "p9", space: "s1", status: "working" },
+  ];
+  const sessions = buildSessions(agents, [{ id: "s1", branch: "main" }], null, [{ pane: "p1", branch: null }]);
+  assert.deepEqual(sessions.map((s) => s.branch), [null, null]);
+});
+
+test("buildSessions gives null branches when called without a pane list", () => {
+  const agents = [{ address: "t1", pane: "p1", space: "s1", status: "working" }];
+  const sessions = buildSessions(agents, [{ id: "s1", branch: "main" }], null);
+  assert.deepEqual(sessions.map((s) => s.branch), [null]);
+});
+
+test("decreePicks preselects only the terminal it was opened for", () => {
+  const sessions = [{ address: "t1", status: "blocked" }, { address: "t2", status: "working" }];
+  assert.deepEqual(decreePicks(sessions, "t2"), ["t2"]);
+  assert.deepEqual(decreePicks(sessions, "t1"), ["t1"]);
+});
+
+test("decreePicks preselects nothing without or beyond a terminal", () => {
+  const sessions = [{ address: "t1", status: "blocked" }, { address: "t2", status: "working" }];
+  assert.deepEqual(decreePicks(sessions, undefined), []);
+  assert.deepEqual(decreePicks(sessions, "t9"), []);
+});
+
+test("decreeTargets sends to working picks and skips waiting ones by name", () => {
+  const sessions = [
+    { address: "t1", status: "blocked", name: "Alpha" },
+    { address: "t2", status: "working", name: "Bravo" },
+  ];
+  assert.deepEqual(decreeTargets(sessions, new Set(["t1", "t2", "t9"])), {
+    send: ["t2"],
+    skipped: ["Alpha"],
+  });
+});
+
+test("decreeBlocker asks for instructions before anything else", () => {
+  const sessions = [{ address: "t2", status: "working", name: "Bravo" }];
+  assert.equal(decreeBlocker(sessions, new Set(["t2"]), "   "), "Write the instructions first");
+});
+
+test("decreeBlocker asks for a session when nothing is picked", () => {
+  const sessions = [{ address: "t2", status: "working", name: "Bravo" }];
+  assert.equal(decreeBlocker(sessions, new Set(), "do it"), "Choose at least one session");
+});
+
+test("decreeBlocker refuses a decree that only reaches waiting sessions", () => {
+  const sessions = [{ address: "t1", status: "blocked", name: "Alpha" }];
+  assert.equal(
+    decreeBlocker(sessions, new Set(["t1"]), "do it"),
+    "Waiting sessions can't take a decree; answer them first",
+  );
+});
+
+test("decreeBlocker clears once a working session is picked", () => {
+  const sessions = [
+    { address: "t1", status: "blocked", name: "Alpha" },
+    { address: "t2", status: "working", name: "Bravo" },
+  ];
+  assert.equal(decreeBlocker(sessions, new Set(["t2"]), "do it"), null);
+});
+
+test("reportMinutes measures a done report from the tab's last change, not its settle time", () => {
+  const now = 1_000_000_000_000;
+  const tab = { settled_at: now - 180 * 60000, changed_at: now - 5 * 60000 };
+  assert.equal(reportMinutes({ status: "done" }, tab, now), 5);
+});
+
+test("reportMinutes measures a done report without a tab from its status stamp", () => {
+  const now = 1_000_000_000_000;
+  assert.equal(reportMinutes({ status: "done", statusUpdatedAt: now - 7 * 60000 }, null, now), 7);
+});
+
+test("reportMinutes measures a working session from the tab's working_since", () => {
+  const now = 1_000_000_000_000;
+  const tab = { working_since: now - 3 * 60000, changed_at: now - 40 * 60000 };
+  assert.equal(reportMinutes({ status: "working", startedAt: now - 100 * 60000 }, tab, now), 3);
+});
+
+test("reportMinutes measures a waiting session from the tab's change", () => {
+  const now = 1_000_000_000_000;
+  assert.equal(reportMinutes({ status: "blocked" }, { changed_at: now - 4 * 60000 }, now), 4);
+});
+
+test("reportMinutes measures a resting session from when it started", () => {
+  const now = 1_000_000_000_000;
+  assert.equal(reportMinutes({ status: "idle", startedAt: now - 9 * 60000 }, null, now), 9);
+});
+
+test("reportMinutes gives zero for a non-finite stamp", () => {
+  const now = 1_000_000_000_000;
+  assert.equal(reportMinutes({ status: "idle", startedAt: NaN }, null, now), 0);
+  assert.equal(reportMinutes({ status: "blocked", statusUpdatedAt: Infinity }, null, now), 0);
+});
+
+test("newTabArgs drops the task for a plain shell", () => {
+  assert.deepEqual(newTabArgs("s1", null, "rm -rf ~"), { space: "s1" });
+});
+
+test("newTabArgs trims the task and keeps the program", () => {
+  assert.deepEqual(newTabArgs("s1", ["claude"], "  hi  "), { space: "s1", argv: ["claude"], task: "hi" });
+});
+
+test("newTabArgs drops a whitespace-only task and a missing space", () => {
+  assert.deepEqual(newTabArgs(null, ["codex"], "  "), { argv: ["codex"] });
 });

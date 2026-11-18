@@ -3,11 +3,12 @@
 import { View } from "gpui-kit";
 import { InputState, TextareaState } from "gpui-base";
 import {
-  appHome, closeOverlay, exec, hc, nextCommand, notify, props, run, setAgentOrder, setShared, shared,
+  appHome, checking, closeOverlay, exec, hc, nextCommand, notify, props, run, setAgentOrder, setShared, shared,
 } from "herdr";
 import { liveAgents, liveData, liveSpaces } from "./source.js";
 import {
-  buildSessions, orderAddresses, pairScan, parseChoices, parseScanStdout, parseUsage, planOf, spanLabel, statusRank, tailLines,
+  buildSessions, decreeBlocker, decreePicks, decreeTargets, newTabArgs, orderAddresses, pairScan, parseChoices, parseScanStdout, parseUsage,
+  planOf, spanLabel, statusRank, tailLines,
 } from "./data.js";
 import {
   liveSessions, nextAction, openPanel, renderBar, renderDial, renderMap, renderNotes, renderRibbon, renderTabs, renderUnit, selectedSession,
@@ -39,6 +40,7 @@ export default class Regent extends View {
       this.published = null;
       this.agentOrder = null;
       this.retrySeen = shared("regent.retry") ?? null;
+      if (checking()) return;
       cx.spawn(async (cx) => {
         for (;;) {
           const command = await nextCommand();
@@ -180,7 +182,6 @@ export default class Regent extends View {
   initOverlay(cx) {
     this.handle = cx.focus_handle();
     this.handle.focus();
-    cx.timer.after(60, (later) => this.handle.focus());
     const p = props() ?? {};
     if (this.role === "decision") {
       this.parsed = undefined;
@@ -196,8 +197,8 @@ export default class Regent extends View {
       this.pickAgent = 0;
       this.taskInput = TextareaState.new({ placeholder: "e.g. Check the migration status and apply it to dev", rows: 3 });
     } else if (this.role === "decree") {
-      this.picked = new Set(buildSessions(liveAgents(), liveSpaces(), null)
-        .filter((session) => session.status === "blocked").map((session) => session.address));
+      this.picked = new Set(decreePicks(buildSessions(liveAgents(), liveSpaces(), null), p.terminal));
+      this.decreeError = null;
       this.decreeInput = TextareaState.new({ placeholder: "e.g. Summarise what you have done in three lines, then stop", rows: 3 });
     } else if (this.role === "find") {
       this.findAt = 0;
@@ -207,11 +208,13 @@ export default class Regent extends View {
         cx.notify();
       });
       this.searchInput.on("submit", () => this.openFound());
-      this.searchInput.focus();
-      cx.timer.after(60, () => this.searchInput.focus());
     } else if (this.role === "report") {
       this.reportTab = "session";
     }
+    // The text field takes the keyboard; key-down still bubbles to the root's overlayKey.
+    const keyboard = this.searchInput ?? this.taskInput ?? this.decreeInput ?? this.handle;
+    keyboard.focus();
+    cx.timer.after(60, () => keyboard.focus());
   }
 
   loadScreen(cx) {
@@ -263,9 +266,12 @@ export default class Regent extends View {
     else if (this.role === "decree" && event.keystroke === "cmd-enter") this.sendDecree(cx);
   }
 
+  // Also the host's teardown hook (View.close), so regent.panel is cleared however the dialog went away.
   close() {
     const overlay = props()?.overlay;
-    if (overlay) closeOverlay(overlay);
+    if (!overlay) return;
+    if (shared("regent.panel") === overlay) setShared("regent.panel", null);
+    closeOverlay(overlay);
   }
 
   focusTerminal() {
@@ -277,13 +283,12 @@ export default class Regent extends View {
 
   answer(n, cx) {
     const terminal = props()?.terminal;
-    const overlay = props()?.overlay;
     if (!terminal) return;
     cx.spawn(async (cx) => {
       try {
         await hc(["keys", terminal, String(n)]);
       } catch {}
-      if (overlay) closeOverlay(overlay);
+      this.close();
       cx.notify();
     });
   }
@@ -299,40 +304,36 @@ export default class Regent extends View {
   }
 
   createSession() {
+    if (this.acted) return;
+    this.acted = true;
     const spaceList = liveSpaces();
     const space = this.pickSpace ?? spaceList.find((s) => s.active)?.id ?? spaceList[0]?.id ?? null;
     const argv = this.pickAgent === 0 ? ["claude"] : this.pickAgent === 1 ? ["codex"] : this.pickAgent === 2 ? ["gemini"] : null;
-    const task = (this.taskInput?.value() ?? "").trim();
-    const args = {};
-    if (space) args.space = space;
-    if (argv) args.argv = argv;
-    if (task) args.task = task;
-    run("tab.new", args);
+    run("tab.new", newTabArgs(space, argv, this.taskInput?.value()));
     this.close();
   }
 
   togglePicked(address, cx) {
     if (this.picked.has(address)) this.picked.delete(address);
     else this.picked.add(address);
+    this.decreeError = null;
     cx.notify();
   }
 
   sendDecree(cx) {
+    if (this.acted) return;
     const text = (this.decreeInput?.value() ?? "").trim();
-    if (!text || !this.picked.size) return;
-    const targets = [...this.picked];
-    const overlay = props()?.overlay;
+    const sessions = buildSessions(liveAgents(), liveSpaces(), null);
+    this.decreeError = decreeBlocker(sessions, this.picked, text);
+    if (this.decreeError) {
+      cx.notify();
+      return;
+    }
+    this.acted = true;
+    const { send, skipped } = decreeTargets(sessions, this.picked);
     cx.spawn(async (cx) => {
-      const sessions = buildSessions(liveAgents(), liveSpaces(), null);
       let sent = 0;
-      const skipped = [];
-      for (const address of targets) {
-        const session = sessions.find((candidate) => candidate.address === address);
-        if (!session) continue;
-        if (session.status === "blocked") {
-          skipped.push(session.name);
-          continue;
-        }
+      for (const address of send) {
         try {
           const result = await hc(["send", address, text]);
           if (result.code === 0) sent += 1;
@@ -343,7 +344,7 @@ export default class Regent extends View {
         body: `Sent to ${sent}${skipped.length ? ` · skipped, waiting for orders: ${skipped.join(", ")}` : ""}`,
         level: "info",
       });
-      if (overlay) closeOverlay(overlay);
+      this.close();
       cx.notify();
     });
   }
@@ -377,15 +378,19 @@ export default class Regent extends View {
     cx.notify();
   }
 
+  // Enter can arrive both as the field's submit and as key-down; act once.
   openFound() {
+    if (this.acted) return;
     const { sessions, commands } = this.findRows();
     if (this.findAt < sessions.length) {
       const session = sessions[this.findAt];
+      this.acted = true;
       setShared("regent.sel", session.address);
       if (session.pane) run("pane.focus", { pane: session.pane });
       this.close();
     } else if (commands[this.findAt - sessions.length]) {
       const role = commands[this.findAt - sessions.length][0];
+      this.acted = true;
       this.close();
       openPanel(role);
     }

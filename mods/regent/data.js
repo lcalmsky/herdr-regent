@@ -80,14 +80,15 @@ export function pairScan(sessions) {
   return byAddress;
 }
 
-export function buildSessions(agentList, spaceList, data) {
+// A space's branch is its first terminal's, so a session's own branch comes from its pane.
+export function buildSessions(agentList, spaceList, data, paneList = []) {
   const extra = data?.sessions ?? {};
   const spaceIndex = {};
-  const spaceBranch = {};
   (spaceList ?? []).forEach((space, index) => {
     spaceIndex[space.id] = index;
-    spaceBranch[space.id] = space.branch ?? null;
   });
+  const paneBranch = {};
+  for (const pane of paneList ?? []) paneBranch[pane.pane] = pane.branch ?? null;
   return (agentList ?? []).map((agent) => {
     const x = extra[agent.address] ?? {};
     const plan = Array.isArray(x.plan) ? x.plan : [];
@@ -98,7 +99,7 @@ export function buildSessions(agentList, spaceList, data) {
       space: agent.space,
       spaceName: agent.space_name,
       spaceIndex: spaceIndex[agent.space] ?? 0,
-      branch: spaceBranch[agent.space] ?? null,
+      branch: paneBranch[agent.pane] ?? null,
       tab: agent.tab,
       tabIndex: agent.tab_index,
       tabName: agent.tab_name,
@@ -377,4 +378,47 @@ export function chipGrid(inner, min = 250, gap = 8, rows = 3) {
   const perRow = Math.max(1, Math.floor((inner + gap) / (min + gap)));
   const chipW = Math.floor((inner - (perRow - 1) * gap) / perRow);
   return { perRow, chipW, capacity: perRow * rows };
+}
+
+// Decree preselects only the session it was opened for: Waiting sessions are never sent to.
+export function decreePicks(sessions, terminal) {
+  return terminal && (sessions ?? []).some((session) => session.address === terminal) ? [terminal] : [];
+}
+
+export function decreeTargets(sessions, picked) {
+  const send = [];
+  const skipped = [];
+  for (const address of picked ?? []) {
+    const session = (sessions ?? []).find((candidate) => candidate.address === address);
+    if (!session) continue;
+    if (session.status === "blocked") skipped.push(session.name);
+    else send.push(address);
+  }
+  return { send, skipped };
+}
+
+// Why Send would do nothing, or null when it would reach at least one session.
+export function decreeBlocker(sessions, picked, text) {
+  if (!String(text ?? "").trim()) return "Write the instructions first";
+  const { send, skipped } = decreeTargets(sessions, picked);
+  if (send.length) return null;
+  return skipped.length ? "Waiting sessions can't take a decree; answer them first" : "Choose at least one session";
+}
+
+// Unread report time runs from the last status change; settled_at is when the tab was put away.
+export function reportMinutes(session, tab, now) {
+  const since = (stamp) => (Number.isFinite(stamp) ? Math.max(0, Math.round((now - stamp) / 60000)) : 0);
+  if (session.status === "working") return since(tab?.working_since ?? session.startedAt);
+  if (session.status === "blocked" || session.status === "done") return since(tab?.changed_at ?? session.statusUpdatedAt);
+  return since(session.startedAt);
+}
+
+// tab.new's task is the agent's first message, so a plain shell gets none.
+export function newTabArgs(space, argv, task) {
+  const args = {};
+  if (space) args.space = space;
+  if (argv) args.argv = argv;
+  const text = String(task ?? "").trim();
+  if (argv && text) args.task = text;
+  return args;
 }

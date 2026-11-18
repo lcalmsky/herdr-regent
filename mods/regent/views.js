@@ -4,7 +4,7 @@
 import { div, image, PathBuilder, Background } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { shared, setShared, run, openOverlay, closeOverlay } from "herdr";
-import { liveAgents, liveData, liveSpaces } from "./source.js";
+import { liveAgents, liveData, livePanes, liveSpaces } from "./source.js";
 import { A, C, FONT, ORDER, ST } from "./tokens.js";
 import {
   GLYPH, actionQueue, bannerOf, buildSessions, chipGrid, chipMinWidth, countsOf, fmtClock, groupMap, portraitOf, queueOf, queueSubtitle, resolveSelected,
@@ -21,7 +21,7 @@ const LINE = C.rule;
 const GOLD = C.accent;
 
 export function liveSessions() {
-  return buildSessions(liveAgents(), liveSpaces(), liveData());
+  return buildSessions(liveAgents(), liveSpaces(), liveData(), livePanes());
 }
 
 export function selectedSession(sessions) {
@@ -334,7 +334,10 @@ function hexCell(session, x, y) {
   return div().id(`regent-hex-${session.address}`).absolute().left(x - 11).top(y - 11).w(22).h(22).cursor_pointer()
     .when(session.status === "blocked", (el) => el.loop("opacity", { from: 0.45, to: 1, period: 1400 }))
     .tooltip(`${session.name}, ${statusLabel(session.status)}`)
-    .on_click(() => setShared("regent.sel", session.address))
+    .on_click(() => {
+      setShared("regent.sel", session.address);
+      if (session.pane) run("pane.focus", { pane: session.pane });
+    })
     .child(div().absolute().left(3).top(3).w(16).h(16).rounded(3).bg(color).opacity(0.55))
     .child(art("ui/hex-frame.png").absolute().left(0).top(0).w(22).h(22));
 }
@@ -395,7 +398,9 @@ export function renderMap(view) {
           .tooltip(entry.group.name)
           .on_click(() => {
             const first = entry.inGroup.find((s) => s.status === "blocked" || s.status === "done") ?? entry.inGroup[0];
-            if (first) setShared("regent.sel", first.address);
+            if (!first) return;
+            setShared("regent.sel", first.address);
+            if (first.pane) run("pane.focus", { pane: first.pane });
           })
           .child(art(`sigil/${sigilOf(entry.group.key)}.png`).absolute().left(5).top(5).w(14).h(14))
           .child(art("ui/hex-frame.png").absolute().left(0).top(0).w(24).h(24)));
@@ -693,17 +698,22 @@ export function nextAction() {
   const selected = selectedSession(sessions);
   const at = queue.findIndex((session) => session.address === selected?.address);
   const next = queue[(at + 1 + queue.length) % queue.length];
-  const panel = shared("regent.panel");
-  if (panel) {
-    try { closeOverlay(panel); } catch {}
-    setShared("regent.panel", null);
-  }
+  closePanel();
   setShared("regent.sel", next.address);
   if (next.pane) run("pane.focus", { pane: next.pane });
   if (next.status === "blocked") openPanel("decision", { terminal: next.address, pane: next.pane });
 }
 
+// Dialogs have no replace-by-key (that is for windows), so the open one is closed by hand.
+export function closePanel() {
+  const panel = shared("regent.panel");
+  if (!panel) return;
+  try { closeOverlay(panel); } catch {}
+  setShared("regent.panel", null);
+}
+
 export function openPanel(role, extra = {}) {
+  closePanel();
   const size = role === "report" || role === "help" || role === "find" ? WIDE : DIALOG;
   const id = openOverlay({
     mod: "regent",

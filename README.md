@@ -22,7 +22,7 @@ cd herdr-regent
 ./tools/install.sh
 ```
 
-The script copies `layouts/regent.json` (with its picker picture `layouts/regent.png`) and `mods/regent/` into `${HERDR_APP_HOME:-$HOME/.config/herdr-app}`, merges `layouts/regent.keys.json` into your `keys.json` (keeping any binding you already have and writing a `keys.json.bak-regent-<timestamp>` copy when it adds one), and runs `herdr-app check` on the mod. When `herdr-shared` is installed and the mod folder is a separate copy, its runtime files are linked to the shared home instead of copied. Nothing is downloaded and no pictures are generated. The runtime files under `mods/regent/` are copies generated from the [herdr-shared](https://github.com/lcalmsky/herdr-shared) submodule at `vendor/herdr-shared`; `git clone --recursive` is only needed for the drift check, not for installing. Then pick the layout with `layout.switch {name: "regent"}`, or reach it with `ctrl-shift-l`, which cycles through the layouts.
+The script copies `layouts/regent.json` (with its picker picture `layouts/regent.png`) and `mods/regent/` into `${HERDR_APP_HOME:-$HOME/.config/herdr-app}`, merges `layouts/regent.keys.json` into your `keys.json` (keeping any binding you already have and writing a `keys.json.bak-regent-<timestamp>` copy when it adds one), restores the execute bits of the mod's runtime files (a reinstall over an older copy keeps that copy's file modes otherwise), and runs `herdr-app check` on the mod; the mod skips its scans, timers and `cca` calls while it is being checked. When `herdr-shared` is installed and the mod folder is a separate copy, its runtime files are linked to the shared home instead of copied. Nothing is downloaded and no pictures are generated. The runtime files under `mods/regent/` are copies generated from the [herdr-shared](https://github.com/lcalmsky/herdr-shared) submodule at `vendor/herdr-shared`; `git clone --recursive` is only needed for the drift check, not for installing. Then pick the layout with `layout.switch {name: "regent"}`, or reach it with `ctrl-shift-l`, which cycles through the layouts.
 
 ## Before adding it
 
@@ -51,7 +51,7 @@ The mod does more than draw. This is everything it runs, sends and reads:
 | ⌘⇧4 | `regent.filter_idle` | Filter the ribbon to Resting |
 | ⌃⌥P | `regent.toggle` | Give the top bar the keyboard, or hand it back to the terminal |
 
-While the top bar has the keyboard, ← → move the selection, ↵ focuses the selected terminal, `e` opens Decree for it, and Esc returns the keyboard to the terminal. In the dialogs: 1–9, ↵ and Esc in Decision; ⌘↵ in New session and Decree; ↑ ↓, ↵ and Esc in Find. Esc closes every dialog. In Complete, ↵ runs Open report; Report and Shortcuts also have a Close button.
+While the top bar has the keyboard, ← → move the selection, ↵ focuses the selected terminal, `e` opens Decree with that session chosen, and Esc returns the keyboard to the terminal. In the dialogs: 1–9, ↵ and Esc in Decision; ⌘↵ in New session and Decree; ↑ ↓, ↵ and Esc in Find. Esc closes every dialog. In Complete, ↵ runs Open report; Report and Shortcuts also have a Close button.
 
 ## What you see
 

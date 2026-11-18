@@ -21,6 +21,8 @@ else
   fi
   mkdir -p "$TARGET"
   cp -R "$REPO/mods/regent/." "$TARGET/"
+  # cp keeps an existing file's mode, so an old 644 cca would stay unrunnable.
+  find "$REPO/mods/regent" -maxdepth 1 -type f -perm -u+x -exec sh -c 'chmod 755 "$1/$(basename "$2")"' _ "$TARGET" {} \;
 fi
 # The installed mod is often a symlink to this repo's own mods/regent; linking there would turn the
 # repo's files into links, so only a separately copied install is linked.
